@@ -1,6 +1,6 @@
 from fastapi import FastAPI
-import httpx
-import redis.asyncio as redis
+import httpx # type: ignore
+import redis.asyncio as redis # type: ignore
 import json
 import os
 

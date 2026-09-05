@@ -31,3 +31,8 @@ services:
 
   redis:
     image: redis:7-alpine
+
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"  
