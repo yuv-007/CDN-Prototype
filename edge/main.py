@@ -3,8 +3,23 @@ import httpx # type: ignore
 import redis.asyncio as redis # type: ignore
 import json
 import os
-
+from fastapi.responses import Response as FastAPIResponse
+from prometheus_client import Counter, CONTENT_TYPE_LATEST, generate_latest
 app = FastAPI()
+requests_total = Counter(
+    "cdn_requests_total",
+    "Total number of requests received by the CDN edge"
+)
+
+cache_hits_total = Counter(
+    "cdn_cache_hits_total",
+    "Total number of cache hits"
+)
+
+cache_misses_total = Counter(
+    "cdn_cache_misses_total",
+    "Total number of cache misses"
+)
 
 redis_client = redis.Redis(
     host="redis",
@@ -15,6 +30,7 @@ redis_client = redis.Redis(
 
 @app.get("/content/{content_id}")
 async def get_content(content_id: str):
+    requests_total.inc()
 
     cache_key = f"content:{content_id}"
 
@@ -22,12 +38,14 @@ async def get_content(content_id: str):
     cached_response = await redis_client.get(cache_key)
 
     if cached_response:
+        cache_hits_total.inc()
         return {
             "source": "cache",
             "data": json.loads(cached_response)
         }
 
     # Cache miss → request Origin
+    cache_misses_total.inc()
     async with httpx.AsyncClient() as client:
         response = await client.get(
             f"http://origin:8000/content/{content_id}"
@@ -47,3 +65,10 @@ async def get_content(content_id: str):
         "source": "origin",
         "data": origin_data
     }
+
+@app.get("/metrics")
+async def metrics():
+    return FastAPIResponse(
+        content=generate_latest(),
+        media_type=CONTENT_TYPE_LATEST
+    )
