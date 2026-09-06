@@ -22,7 +22,7 @@ cache_misses_total = Counter(
 )
 
 redis_client = redis.Redis(
-    host="redis",
+    host=os.getenv("REDIS_HOST", "redis"),
     port=6379,
     decode_responses=True
 )

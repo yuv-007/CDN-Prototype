@@ -7,17 +7,57 @@ services:
     expose:
       - "8000"
 
-  edge:
+  edge-mumbai:
     build:
       context: .
       dockerfile: edge/Dockerfile
-    expose:
-      - "8001"
-    depends_on:
-      - origin
-      - redis
     environment:
-      CACHE_TTL: 60  
+      REDIS_HOST: redis-mumbai
+      CACHE_TTL: "60"
+      EDGE_ID: mumbai
+      EDGE_LAT: "19.0760"
+      EDGE_LON: "72.8777"
+    depends_on:
+      - redis-mumbai
+      - origin
+
+  edge-virginia:
+    build:
+      context: .
+      dockerfile: edge/Dockerfile
+    environment:
+      REDIS_HOST: redis-virginia
+      CACHE_TTL: "60"
+      EDGE_ID: virginia
+      EDGE_LAT: "37.4316"
+      EDGE_LON: "-78.6569"
+    depends_on:
+      - redis-virginia
+      - origin
+
+  edge-japan:
+    build:
+      context: .
+      dockerfile: edge/Dockerfile
+    environment:
+      REDIS_HOST: redis-japan
+      CACHE_TTL: "60"
+      EDGE_ID: japan
+      EDGE_LAT: "35.6762"
+      EDGE_LON: "139.6503"
+    depends_on:
+      - redis-japan
+      - origin
+     
+  redis-mumbai:
+    image: redis:7-alpine
+
+  redis-virginia:
+    image: redis:7-alpine
+
+  redis-japan:
+    image: redis:7-alpine
+
 
   nginx:
     image: nginx:latest
@@ -45,3 +85,12 @@ services:
       - "3000:3000"
     depends_on:
       - prometheus
+  
+  router:
+    build:
+      context: .
+      dockerfile: router/Dockerfile
+    depends_on:
+      - edge-mumbai
+      - edge-virginia
+      - edge-japan
