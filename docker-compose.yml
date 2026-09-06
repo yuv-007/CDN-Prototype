@@ -77,12 +77,12 @@ services:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
 
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana
     ports:
       - "3000:3000"
-    depends_on:
-      - prometheus
-  
+    volumes:
+      - grafana_data:/var/lib/grafana
+
   router:
     build:
       context: .
@@ -91,3 +91,7 @@ services:
       - edge-mumbai
       - edge-virginia
       - edge-japan
+
+volumes:
+  grafana_data:  
+  
