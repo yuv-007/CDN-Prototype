@@ -5,6 +5,12 @@ import math
 app = FastAPI()
 
 
+@app.get("/")
+def root():
+    return {
+        "message": "Hello from the origin server"
+    }
+
 # --------------------------------------------------
 # CDN Edge locations
 # --------------------------------------------------
@@ -93,6 +99,7 @@ def find_closest_edge(client_lat, client_lon):
 # --------------------------------------------------
 # Route request
 # --------------------------------------------------
+
 
 @app.api_route(
     "/content/{content_id}",
