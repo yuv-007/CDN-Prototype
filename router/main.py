@@ -11,7 +11,13 @@ fallback_redis = redis.Redis(
     port=6379,
     decode_responses=True
 )
+@app.get("/ip")
+async def get_client_ip(request: Request):
+    client_ip = request.headers.get("X-Real-IP")
 
+    return {
+        "client_ip": client_ip
+    }
 # --------------------------------------------------
 # CDN Edge locations
 # --------------------------------------------------
