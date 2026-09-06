@@ -1,15 +1,16 @@
 from fastapi import FastAPI, Request, HTTPException
 import httpx
 import math
+import redis.asyncio as redis
+import json
 
 app = FastAPI()
 
-
-@app.get("/")
-def root():
-    return {
-        "message": "Hello from the origin server"
-    }
+fallback_redis = redis.Redis(
+    host="redis",
+    port=6379,
+    decode_responses=True
+)
 
 # --------------------------------------------------
 # CDN Edge locations
@@ -35,6 +36,20 @@ edges = [
         "lon": 139.6503
     }
 ]
+
+# --------------------------------------------------
+# Default route for health check ("/")
+# --------------------------------------------------
+
+
+@app.get("/")
+def root():
+    return {
+        "message": "Hello from the Geographic router",
+        "edges": [edge["id"] for edge in edges]
+
+    }
+
 
 
 # --------------------------------------------------
@@ -110,6 +125,45 @@ async def route_request(
     request: Request
 ):
 
+    
+    # ----------------------------------------------
+    # No location → fallback to Origin
+    # ----------------------------------------------
+
+
+    async def fallback_response(content_id: str):
+        cache_key = f"content:{content_id}"
+
+        cached_response = await fallback_redis.get(cache_key)
+
+        if cached_response:
+            return {
+                "selected_edge": "fallback",
+                "source": "cache",
+                "data": json.loads(cached_response)
+            }
+
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"http://origin:8000/content/{content_id}"
+            )
+
+        origin_data = response.json()
+
+        CACHE_TTL = 60
+
+        await fallback_redis.set(
+            cache_key,
+            json.dumps(origin_data),
+            ex=CACHE_TTL
+        )
+
+        return {
+            "selected_edge": "fallback",
+            "source": "origin",
+            "data": origin_data
+        }
+
     # ----------------------------------------------
     # Get client's geographic coordinates
     # ----------------------------------------------
@@ -117,22 +171,17 @@ async def route_request(
     client_lat = request.query_params.get("lat")
     client_lon = request.query_params.get("lon")
 
+    # No coordinates → fallback
     if client_lat is None or client_lon is None:
-        raise HTTPException(
-            status_code=400,
-            detail="Client latitude and longitude are required"
-        )
+        return await fallback_response(content_id)
 
+    # Invalid coordinates → fallback
     try:
         client_lat = float(client_lat)
         client_lon = float(client_lon)
 
     except ValueError:
-        raise HTTPException(
-            status_code=400,
-            detail="Latitude and longitude must be numbers"
-        )
-
+        return await fallback_response(content_id)
 
     # ----------------------------------------------
     # Find closest Edge
