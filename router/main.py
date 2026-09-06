@@ -5,8 +5,11 @@ import redis.asyncio as redis
 import json
 import geoip2.database
 import geoip2.errors
+import os
     
 app = FastAPI()
+
+ORIGIN_HOST = os.getenv("ORIGIN_HOST", "origin")
 
 geoip_reader = geoip2.database.Reader(
     "router/geoip/GeoLite2-City.mmdb"
@@ -160,7 +163,7 @@ async def fallback_response(content_id: str):
 
     async with httpx.AsyncClient() as client:
         response = await client.get(
-            f"http://origin:8000/content/{content_id}"
+            f"http://{ORIGIN_HOST}:8000/content/{content_id}"
         )
 
     origin_data = response.json()

@@ -21,6 +21,10 @@ cache_misses_total = Counter(
     "Total number of cache misses"
 )
 
+EDGE_ID = os.getenv("EDGE_ID", "unknown")
+
+ORIGIN_HOST = os.getenv("ORIGIN_HOST", "origin")
+
 redis_client = redis.Redis(
     host=os.getenv("REDIS_HOST", "redis"),
     port=6379,
@@ -48,7 +52,7 @@ async def get_content(content_id: str):
     cache_misses_total.inc()
     async with httpx.AsyncClient() as client:
         response = await client.get(
-            f"http://origin:8000/content/{content_id}"
+            f"http://{ORIGIN_HOST}:8000/content/{content_id}"
         )
 
     origin_data = response.json()

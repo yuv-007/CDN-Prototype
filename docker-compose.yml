@@ -17,6 +17,7 @@ services:
       EDGE_ID: mumbai
       EDGE_LAT: "19.0760"
       EDGE_LON: "72.8777"
+      ORIGIN_HOST: origin
     depends_on:
       - redis-mumbai
       - origin
@@ -31,6 +32,7 @@ services:
       EDGE_ID: virginia
       EDGE_LAT: "37.4316"
       EDGE_LON: "-78.6569"
+      ORIGIN_HOST: origin      
     depends_on:
       - redis-virginia
       - origin
@@ -45,6 +47,7 @@ services:
       EDGE_ID: japan
       EDGE_LAT: "35.6762"
       EDGE_LON: "139.6503"
+      ORIGIN_HOST: origin
     depends_on:
       - redis-japan
       - origin
@@ -87,6 +90,8 @@ services:
     build:
       context: .
       dockerfile: router/Dockerfile
+      environment:
+        ORIGIN_HOST: origin
     depends_on:
       - edge-mumbai
       - edge-virginia
