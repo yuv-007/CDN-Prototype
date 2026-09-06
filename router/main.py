@@ -3,8 +3,14 @@ import httpx
 import math
 import redis.asyncio as redis
 import json
-
+import geoip2.database
+import geoip2.errors
+    
 app = FastAPI()
+
+geoip_reader = geoip2.database.Reader(
+    "router/geoip/GeoLite2-City.mmdb"
+)
 
 fallback_redis = redis.Redis(
     host="redis",
@@ -18,6 +24,20 @@ async def get_client_ip(request: Request):
     return {
         "client_ip": client_ip
     }
+
+def get_location_from_ip(client_ip):
+
+    try:
+        response = geoip_reader.city(client_ip)
+
+        latitude = response.location.latitude
+        longitude = response.location.longitude
+
+        return latitude, longitude
+
+    except geoip2.errors.AddressNotFoundError:
+        return None, None
+    
 # --------------------------------------------------
 # CDN Edge locations
 # --------------------------------------------------
@@ -121,6 +141,43 @@ def find_closest_edge(client_lat, client_lon):
 # Route request
 # --------------------------------------------------
 
+# ----------------------------------------------
+    # No location → fallback to Origin
+    # ----------------------------------------------
+
+
+async def fallback_response(content_id: str):
+    cache_key = f"content:{content_id}"
+
+    cached_response = await fallback_redis.get(cache_key)
+
+    if cached_response:
+        return {
+            "selected_edge": "fallback",
+            "source": "cache",
+            "data": json.loads(cached_response)
+        }
+
+    async with httpx.AsyncClient() as client:
+        response = await client.get(
+            f"http://origin:8000/content/{content_id}"
+        )
+
+    origin_data = response.json()
+
+    CACHE_TTL = 60
+
+    await fallback_redis.set(
+        cache_key,
+        json.dumps(origin_data),
+        ex=CACHE_TTL
+    )
+
+    return {
+        "selected_edge": "fallback",
+        "source": "origin",
+        "data": origin_data
+    }
 
 @app.api_route(
     "/content/{content_id}",
@@ -132,63 +189,28 @@ async def route_request(
 ):
 
     
-    # ----------------------------------------------
-    # No location → fallback to Origin
-    # ----------------------------------------------
+    
+    client_ip = request.headers.get("X-Real-IP")
 
+    # Development/testing override
+    test_ip = request.query_params.get("test_ip")
 
-    async def fallback_response(content_id: str):
-        cache_key = f"content:{content_id}"
+    if test_ip:
+        client_ip = test_ip
 
-        cached_response = await fallback_redis.get(cache_key)
-
-        if cached_response:
-            return {
-                "selected_edge": "fallback",
-                "source": "cache",
-                "data": json.loads(cached_response)
-            }
-
-        async with httpx.AsyncClient() as client:
-            response = await client.get(
-                f"http://origin:8000/content/{content_id}"
-            )
-
-        origin_data = response.json()
-
-        CACHE_TTL = 60
-
-        await fallback_redis.set(
-            cache_key,
-            json.dumps(origin_data),
-            ex=CACHE_TTL
-        )
-
-        return {
-            "selected_edge": "fallback",
-            "source": "origin",
-            "data": origin_data
-        }
+    # No IP → fallback
+    if client_ip is None:
+        return await fallback_response(content_id)
 
     # ----------------------------------------------
-    # Get client's geographic coordinates
+    # Convert IP → geographic coordinates
     # ----------------------------------------------
 
-    client_lat = request.query_params.get("lat")
-    client_lon = request.query_params.get("lon")
-
-    # No coordinates → fallback
+    client_lat, client_lon = get_location_from_ip(client_ip)
+    
     if client_lat is None or client_lon is None:
         return await fallback_response(content_id)
-
-    # Invalid coordinates → fallback
-    try:
-        client_lat = float(client_lat)
-        client_lon = float(client_lon)
-
-    except ValueError:
-        return await fallback_response(content_id)
-
+        
     # ----------------------------------------------
     # Find closest Edge
     # ----------------------------------------------
