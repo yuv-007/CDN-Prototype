@@ -1,0 +1,9 @@
+services:
+
+  origin:
+    build:
+      context: .
+      dockerfile: origin/Dockerfile
+
+    ports:
+      - "8000:8000"
