@@ -48,24 +48,23 @@ def get_location_from_ip(client_ip):
 edges = [
     {
         "id": "mumbai",
-        "host": "edge-mumbai",
+        "host": "35.154.233.143",
         "lat": 19.0760,
         "lon": 72.8777
     },
     {
         "id": "virginia",
-        "host": "edge-virginia",
+        "host": "52.87.173.71",
         "lat": 37.4316,
         "lon": -78.6569
     },
     {
         "id": "japan",
-        "host": "edge-japan",
+        "host": "54.92.8.201",
         "lat": 35.6762,
         "lon": 139.6503
     }
 ]
-
 # --------------------------------------------------
 # Default route for health check ("/")
 # --------------------------------------------------
@@ -163,8 +162,8 @@ async def fallback_response(content_id: str):
 
     async with httpx.AsyncClient() as client:
         response = await client.get(
-            f"http://{ORIGIN_HOST}:8000/content/{content_id}"
-        )
+    f"http://52.78.19.134:8000/content/{content_id}"
+)
 
     origin_data = response.json()
 

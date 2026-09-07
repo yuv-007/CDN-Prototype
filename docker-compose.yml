@@ -4,8 +4,8 @@ services:
     build:
       context: .
       dockerfile: origin/Dockerfile
-    expose:
-      - "8000"
+    ports:
+    - "8000:8000"
 
   edge-mumbai:
     build:
@@ -17,10 +17,11 @@ services:
       EDGE_ID: mumbai
       EDGE_LAT: "19.0760"
       EDGE_LON: "72.8777"
-      ORIGIN_HOST: origin
+      ORIGIN_HOST: 52.78.19.134
+    ports:
+      - "8001:8001"
     depends_on:
       - redis-mumbai
-      - origin
 
   edge-virginia:
     build:
@@ -32,10 +33,11 @@ services:
       EDGE_ID: virginia
       EDGE_LAT: "37.4316"
       EDGE_LON: "-78.6569"
-      ORIGIN_HOST: origin      
+      ORIGIN_HOST: 52.78.19.134    
+    ports:
+      - "8001:8001"
     depends_on:
       - redis-virginia
-      - origin
 
   edge-japan:
     build:
@@ -47,10 +49,11 @@ services:
       EDGE_ID: japan
       EDGE_LAT: "35.6762"
       EDGE_LON: "139.6503"
-      ORIGIN_HOST: origin
+      ORIGIN_HOST: 52.78.19.134
+    ports:
+      - "8001:8001"
     depends_on:
       - redis-japan
-      - origin
      
   redis-mumbai:
     image: redis:7-alpine

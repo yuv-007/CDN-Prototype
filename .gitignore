@@ -219,3 +219,6 @@ __marimo__/
 
 # GeoIP-city database
 router/geoip/*.mmdb
+
+# Elastic IPs for reference
+IPs.txt
