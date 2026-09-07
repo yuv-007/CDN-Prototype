@@ -1,0 +1,27 @@
+services:
+
+  edge-mumbai:
+    build:
+      context: .
+      dockerfile: edge/Dockerfile
+
+    environment:
+      REDIS_HOST: redis-mumbai
+      CACHE_TTL: "60"
+      EDGE_ID: mumbai
+      EDGE_LAT: "19.0760"
+      EDGE_LON: "72.8777"
+
+      # TEMPORARY:
+      # We'll replace this with the actual Origin address.
+      ORIGIN_HOST: origin
+
+    ports:
+      - "8001:8001"
+
+    depends_on:
+      - redis-mumbai
+
+
+  redis-mumbai:
+    image: redis:7-alpine
