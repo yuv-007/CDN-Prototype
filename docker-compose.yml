@@ -90,7 +90,7 @@ services:
     build:
       context: .
       dockerfile: router/Dockerfile
-      environment:
+    environment:
         ORIGIN_HOST: origin
     depends_on:
       - edge-mumbai

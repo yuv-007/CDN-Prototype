@@ -6,22 +6,25 @@ import os
 from fastapi.responses import Response as FastAPIResponse
 from prometheus_client import Counter, CONTENT_TYPE_LATEST, generate_latest
 app = FastAPI()
+EDGE_ID = os.getenv("EDGE_ID", "unknown")
+
 requests_total = Counter(
     "cdn_requests_total",
-    "Total number of requests received by the CDN edge"
+    "Total number of requests received by the CDN edge",
+    ["edge"]
 )
 
 cache_hits_total = Counter(
     "cdn_cache_hits_total",
-    "Total number of cache hits"
+    "Total number of cache hits",
+    ["edge"]
 )
 
 cache_misses_total = Counter(
     "cdn_cache_misses_total",
-    "Total number of cache misses"
+    "Total number of cache misses",
+    ["edge"]
 )
-
-EDGE_ID = os.getenv("EDGE_ID", "unknown")
 
 ORIGIN_HOST = os.getenv("ORIGIN_HOST", "origin")
 
@@ -34,22 +37,21 @@ redis_client = redis.Redis(
 
 @app.get("/content/{content_id}")
 async def get_content(content_id: str):
-    requests_total.inc()
-
+    requests_total.labels(edge=EDGE_ID).inc()
     cache_key = f"content:{content_id}"
 
     # Check cache
     cached_response = await redis_client.get(cache_key)
 
     if cached_response:
-        cache_hits_total.inc()
+        cache_hits_total.labels(edge=EDGE_ID).inc()
         return {
             "source": "cache",
             "data": json.loads(cached_response)
         }
 
     # Cache miss → request Origin
-    cache_misses_total.inc()
+    cache_misses_total.labels(edge=EDGE_ID).inc()
     async with httpx.AsyncClient() as client:
         response = await client.get(
             f"http://{ORIGIN_HOST}:8000/content/{content_id}"
