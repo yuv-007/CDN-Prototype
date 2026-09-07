@@ -1,0 +1,23 @@
+services:
+
+  edge-virginia:
+    build:
+      context: .
+      dockerfile: edge/Dockerfile
+    environment:
+      REDIS_HOST: redis-virginia
+      CACHE_TTL: "60"
+      EDGE_ID: virginia
+      EDGE_LAT: "37.4316"
+      EDGE_LON: "-78.6569"
+      ORIGIN_HOST: 52.78.19.134    
+    ports:
+      - "8001:8001"
+    depends_on:
+      - redis-virginia
+  
+
+  redis-virginia:
+    image: redis:7-alpine
+
+  
