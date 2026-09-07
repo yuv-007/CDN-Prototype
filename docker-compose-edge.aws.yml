@@ -14,7 +14,10 @@ services:
 
       # TEMPORARY:
       # We'll replace this with the actual Origin address.
-      ORIGIN_HOST: origin
+      # ORIGIN_HOST: origin
+
+      #finally replacing this with the actual Origin address...and shall comment out the above line NOW after testing on docker and now shifting on to aws
+      ORIGIN_HOST: 52.78.19.134
 
     ports:
       - "8001:8001"
