@@ -476,6 +476,8 @@ After validating the architecture locally, the logical edge containers were move
 
 Each AWS edge runs the same Dockerized edge service with its region-specific identity and an independent local cache.
 
+![Docker to AWS](docs\images\Docker-to-AWS.png)
+
 ---
 
 # 🗺️ Geographic Routing
