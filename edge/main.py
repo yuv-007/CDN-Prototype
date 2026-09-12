@@ -75,10 +75,3 @@ async def get_content(content_id: str):
         "source": "origin",
         "data": origin_data
     }
-
-@app.get("/metrics")
-async def metrics():
-    return FastAPIResponse(
-        content=generate_latest(),
-        media_type=CONTENT_TYPE_LATEST
-    )

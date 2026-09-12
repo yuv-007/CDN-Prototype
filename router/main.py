@@ -6,8 +6,11 @@ import json
 import geoip2.database
 import geoip2.errors
 import os
-    
+from prometheus_fastapi_instrumentator import Instrumentator
+ 
 app = FastAPI()
+
+Instrumentator().instrument(app).expose(app)
 
 ORIGIN_HOST = os.getenv("ORIGIN_HOST", "origin")
 
