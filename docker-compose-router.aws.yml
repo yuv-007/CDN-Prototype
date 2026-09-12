@@ -19,7 +19,7 @@ services:
       dockerfile: router/Dockerfile
 
     environment:
-      ORIGIN_HOST: 52.78.19.134
+      ORIGIN_HOST: 13.125.80.195
 
     depends_on:
       - redis

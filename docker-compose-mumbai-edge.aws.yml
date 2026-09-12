@@ -17,7 +17,7 @@ services:
       # ORIGIN_HOST: origin
 
       #finally replacing this with the actual Origin address...and shall comment out the above line NOW after testing on docker and now shifting on to aws
-      ORIGIN_HOST: 52.78.19.134
+      ORIGIN_HOST: 13.125.80.195
 
     ports:
       - "8001:8001"

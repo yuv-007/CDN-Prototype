@@ -48,19 +48,19 @@ def get_location_from_ip(client_ip):
 edges = [
     {
         "id": "mumbai",
-        "host": "35.154.233.143",
+        "host": "3.7.18.97",
         "lat": 19.0760,
         "lon": 72.8777
     },
     {
         "id": "virginia",
-        "host": "184.192.2.185",
+        "host": "34.235.239.250",
         "lat": 37.4316,
         "lon": -78.6569
     },
     {
         "id": "japan",
-        "host": "54.92.8.201",
+        "host": "3.112.102.134",
         "lat": 35.6762,
         "lon": 139.6503
     }
@@ -162,7 +162,7 @@ async def fallback_response(content_id: str):
 
     async with httpx.AsyncClient() as client:
         response = await client.get(
-    f"http://52.78.19.134:8000/content/{content_id}"
+    f"http://{ORIGIN_HOST}:8000/content/{content_id}"
 )
 
     origin_data = response.json()
