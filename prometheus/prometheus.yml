@@ -2,6 +2,31 @@ global:
   scrape_interval: 5s
 
 scrape_configs:
-  - job_name: "edge"
+
+  - job_name: "origin"
     static_configs:
-      - targets: ["edge:8001"]
+      - targets: ["13.125.80.195:8000"]
+        labels:
+          service: "origin"
+          region: "seoul"
+
+  - job_name: "edge-mumbai"
+    static_configs:
+      - targets: ["3.7.18.97:8001"]
+        labels:
+          service: "edge"
+          region: "mumbai"
+
+  - job_name: "edge-tokyo"
+    static_configs:
+      - targets: ["3.112.102.134:8001"]
+        labels:
+          service: "edge"
+          region: "tokyo"
+
+  - job_name: "edge-virginia"
+    static_configs:
+      - targets: ["34.235.239.250:8001"]
+        labels:
+          service: "edge"
+          region: "virginia"
