@@ -5,7 +5,11 @@ import json
 import os
 from fastapi.responses import Response as FastAPIResponse
 from prometheus_client import Counter, CONTENT_TYPE_LATEST, generate_latest
+from prometheus_fastapi_instrumentator import Instrumentator
+
 app = FastAPI()
+
+Instrumentator().instrument(app).expose(app)
 EDGE_ID = os.getenv("EDGE_ID", "unknown")
 
 requests_total = Counter(

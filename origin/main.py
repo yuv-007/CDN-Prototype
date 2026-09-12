@@ -1,6 +1,8 @@
 from fastapi import FastAPI
+from prometheus_fastapi_instrumentator import Instrumentator
 
 app = FastAPI(title="CDN Origin Server")
+Instrumentator().instrument(app).expose(app)
 
 
 @app.get("/")
