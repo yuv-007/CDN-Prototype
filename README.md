@@ -555,7 +555,7 @@ Lower Delivery Latency
 
 A Grafana dashboard can therefore be used to visually demonstrate the performance impact of caching.
 
-![Grafana Dashboard](docs/images/grafana-dashboard.png)
+![Grafana Dashboard](docs/images/grafana-dashboard.jpg)
 
 ---
 
