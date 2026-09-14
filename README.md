@@ -55,17 +55,10 @@ The core idea is simple:
                           │
                      Cache MISS
                           │
-                          ▼
-                 ┌─────────────────┐
-                 │ Origin Load     │
-                 │ Balancer        │
-                 └────────┬────────┘
-                          │
-                    ┌─────┴─────┐
-                    ▼           ▼
-               ┌────────┐  ┌────────┐
-               │Origin 1│  │Origin 2│
-               └────────┘  └────────┘
+                          ▼           
+                     ┌────────┐  
+                     │ Origin │  
+                     └────────┘  
 ```
 
 ---
@@ -142,25 +135,16 @@ The final system consists of **four major layers**:
               │                │                │
               └────────────────┼────────────────┘
                                │
-                          Cache MISS
+                           Cache MISS
                                │
-                               ▼
-                    ┌────────────────────┐
-                    │   Origin Layer    │
-                    │                    │
-                    │ Load Balancer      │
-                    └─────────┬──────────┘
-                              │
-                         ┌────┴────┐
-                         ▼         ▼
-                    ┌────────┐ ┌────────┐
-                    │Origin 1│ │Origin 2│
-                    └────────┘ └────────┘
-
+                               ▼           
+                          ┌────────┐  
+                          │ Origin │  
+                          └────────┘
                     ┌────────────────────┐
                     │ Prometheus         │
                     │        +           │
-                    │ Grafana             │
+                    │ Grafana            │
                     └────────────────────┘
 ```
 
@@ -266,11 +250,7 @@ Mumbai Edge
 Cache MISS
  │
  ▼
-Origin Load Balancer
- │
- ├──► Origin 1
- │
- └──► Origin 2
+ Origin 1
  │
  ▼
 Response
@@ -380,27 +360,7 @@ Geographic routing distributes traffic between **edges**:
        Mumbai     Virginia     Tokyo
 ```
 
-The origin load balancer then distributes cache misses between **origin servers**:
-
-```text
-                 Origin Distribution
-
-                    Edge
-                     │
-                     ▼
-              ┌─────────────┐
-              │ Origin Load │
-              │   Balancer  │
-              └──────┬──────┘
-                     │
-              ┌──────┴──────┐
-              ▼             ▼
-          Origin 1       Origin 2
-```
-
-Therefore the project demonstrates **two independent forms of traffic distribution**:
-
-> **Geographic distribution at the edge + load balancing at the origin.**
+Therefore the project demonstrates **independent form of traffic distribution**:
 
 ---
 
@@ -422,8 +382,6 @@ docker-compose
       ├── edge-tokyo
       │
       ├── origin
-      │
-      ├── load-balancer
       │
       ├── prometheus
       │
@@ -458,6 +416,7 @@ After validating the architecture locally, the logical edge containers were move
             │               │                │
             ▼               ▼                ▼
        AWS Mumbai      AWS Virginia      AWS Tokyo
+          Edge             Edge             Edge
        ap-south-1       us-east-1      ap-northeast-1
             │               │                │
             │               │                │
@@ -466,12 +425,10 @@ After validating the architecture locally, the logical edge containers were move
                        Cache MISS
                             │
                             ▼
-                     AWS Seoul Origin
-                     ap-northeast-2
-                            │
-                     ┌──────┴──────┐
-                     ▼             ▼
-                 Origin 1      Origin 2
+                        AWS Seoul
+                         Origin
+                      ap-northeast-2
+                            
 ```
 
 Each AWS edge runs the same Dockerized edge service with its region-specific identity and an independent local cache.
@@ -1093,17 +1050,6 @@ Cache HIT
    ↓
 Origin request = 0
 ```
-
-### Origin load balancing
-
-```text
-Cache MISS
-   ↓
-Origin Load Balancer
-   ├── Origin 1
-   └── Origin 2
-```
-
 ---
 
 # 📁 Project Structure
@@ -1416,6 +1362,7 @@ Possible extensions include:
 
 * IP-based automatic geolocation
 * Real latency-based edge selection
+* Origin load-balancing
 * Health-aware routing
 * Edge failover
 * TTL-based cache expiration
