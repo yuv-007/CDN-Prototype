@@ -525,35 +525,497 @@ The project's coordinate-based routing provides an understandable model of the f
 
 ---
 
+
 # 📊 Observability
 
-The project includes **Prometheus and Grafana** for monitoring.
+CDN-Prototype V1 includes a dedicated observability layer using **Prometheus** and **Grafana**.
 
-The monitoring layer is designed to expose metrics such as:
+The monitoring stack collects metrics from the Origin Server and all three CDN Edge Servers, allowing the system to be monitored centrally from a single dashboard.
 
-* Request rate
-* Cache hits
-* Cache misses
-* Cache hit ratio
-* Request latency
-* Origin requests
-* Errors
-* Per-edge traffic
-* CPU / memory / network metrics
+---
 
-The important relationship being demonstrated is:
+## Observability Architecture
 
 ```text
-Higher Cache Hit Ratio
-          ↓
-Fewer Origin Requests
-          ↓
-Lower Origin Load
-          ↓
-Lower Delivery Latency
+                         ┌──────────────────────────┐
+                         │        Grafana            │
+                         │   CDN Operations Center   │
+                         └────────────┬─────────────┘
+                                      │
+                        Prometheus Data Source (PromQL)
+                                      │
+                         ┌────────────▼─────────────┐
+                         │       Prometheus          │
+                         │    Monitoring Instance    │
+                         └──────┬──────┬──────┬──────┘─────────┐
+                                │      │      │                │
+                    ┌───────────┘      │      └───────────┐    └───────────────┐
+                    │                  │                  │                    │ 
+             ┌──────▼──────┐    ┌──────▼──────┐    ┌──────▼──────┐    ┌────────▼────────┐
+             │ Mumbai Edge │    │ Tokyo Edge  │    │Virginia Edge│    │  Origin Server  │
+             │   :8001     │    │   :8001     │    │   :8001     │    │      :8000      │
+             └─────────────┘    └─────────────┘    └─────────────┘    └─────────────────┘        
 ```
 
-A Grafana dashboard can therefore be used to visually demonstrate the performance impact of caching.
+Prometheus periodically scrapes the `/metrics` endpoint exposed by each service.
+
+---
+
+## Components
+
+### Prometheus
+
+Prometheus runs on the dedicated monitoring EC2 instance.
+
+Its responsibilities are:
+
+- Scraping metrics from all CDN components
+- Storing time-series metrics
+- Providing a query interface using PromQL
+- Tracking target health
+- Supplying the metrics used by Grafana
+
+The Prometheus configuration is located at:
+
+```text
+prometheus/
+└── prometheus.yml
+```
+
+The monitoring deployment is defined in:
+
+```text
+docker-compose-monitoring.aws.yml
+```
+
+---
+
+### Grafana
+
+Grafana runs alongside Prometheus on the monitoring EC2 instance.
+
+Grafana uses Prometheus as its data source and provides the **CDN Operations Center** dashboard.
+
+The dashboard provides a centralized view of:
+
+- CDN request volume
+- Cache performance
+- Origin fetch activity
+- Request latency
+- HTTP status codes
+- Response sizes
+- CPU and memory usage
+- Prometheus target health
+
+---
+
+## Metrics Collection
+
+The Edge Servers use:
+
+```python
+from prometheus_fastapi_instrumentator import Instrumentator
+
+Instrumentator().instrument(app).expose(app)
+```
+
+This automatically exposes application-level HTTP metrics through:
+
+```text
+/metrics
+```
+
+The Origin Server also uses the Prometheus FastAPI Instrumentator, so its HTTP metrics are exposed through the same endpoint.
+
+The custom CDN metrics are defined using the Prometheus Python client.
+
+---
+
+## Custom CDN Metrics
+
+The CDN Edge application defines three custom counters.
+
+### `cdn_requests_total`
+
+Counts the total number of requests received by each CDN Edge.
+
+```text
+cdn_requests_total{edge="mumbai"}
+cdn_requests_total{edge="japan"}
+cdn_requests_total{edge="virginia"}
+```
+
+The `edge` label identifies which edge generated the metric.
+
+---
+
+### `cdn_cache_hits_total`
+
+Counts requests that were successfully served from the Redis cache.
+
+```text
+cdn_cache_hits_total{edge="mumbai"}
+cdn_cache_hits_total{edge="japan"}
+cdn_cache_hits_total{edge="virginia"}
+```
+
+---
+
+### `cdn_cache_misses_total`
+
+Counts requests that were not found in the Redis cache and therefore required a request to the Origin Server.
+
+```text
+cdn_cache_misses_total{edge="mumbai"}
+cdn_cache_misses_total{edge="japan"}
+cdn_cache_misses_total{edge="virginia"}
+```
+
+---
+
+## Automatically Collected HTTP Metrics
+
+`prometheus-fastapi-instrumentator` also exposes HTTP/application metrics.
+
+Important metrics include:
+
+```text
+http_requests_total
+
+http_request_duration_seconds_bucket
+http_request_duration_seconds_count
+http_request_duration_seconds_sum
+
+http_request_duration_highr_seconds_bucket
+http_request_duration_highr_seconds_count
+http_request_duration_highr_seconds_sum
+
+http_request_size_bytes_count
+http_request_size_bytes_sum
+
+http_response_size_bytes_count
+http_response_size_bytes_sum
+```
+
+These metrics allow the dashboard to measure request rate, latency, request sizes, response sizes, and HTTP traffic behaviour.
+
+---
+
+## Process and Runtime Metrics
+
+Prometheus also collects Python/process-level metrics exposed by the applications.
+
+Examples include:
+
+```text
+process_cpu_seconds_total
+process_resident_memory_bytes
+process_virtual_memory_bytes
+process_open_fds
+process_max_fds
+process_start_time_seconds
+
+python_info
+python_gc_collections_total
+python_gc_objects_collected_total
+python_gc_objects_uncollectable_total
+```
+
+These metrics provide basic visibility into the health and resource usage of the running services.
+
+---
+
+## Prometheus Health Metrics
+
+Prometheus itself exposes useful monitoring information such as:
+
+```text
+up
+scrape_duration_seconds
+scrape_samples_scraped
+scrape_samples_post_metric_relabeling
+scrape_series_added
+```
+
+## Prometheus Targets
+
+The monitoring instance scrapes four application targets:
+
+| Target | Endpoint | Purpose |
+|---|---|---|
+| Mumbai Edge | `http://<MUMBAI-IP>:8001/metrics` | Mumbai CDN edge |
+| Tokyo Edge | `http://<TOKYO-IP>:8001/metrics` | Tokyo CDN edge |
+| Virginia Edge | `http://<VIRGINIA-IP>:8001/metrics` | Virginia CDN edge |
+| Origin | `http://<ORIGIN-IP>:8000/metrics` | Origin server |
+
+The actual EC2 public IP addresses are configured in the AWS-specific Prometheus configuration.
+
+---
+
+## Verifying Prometheus Targets
+
+The active Prometheus targets can be checked from the monitoring instance:
+
+```bash
+curl -s http://localhost:9090/api/v1/targets | \
+jq '.data.activeTargets[] | {job: .labels.job, health: .health, url: .scrapeUrl}'
+```
+
+A healthy deployment should report:
+
+```text
+edge-mumbai   → up
+edge-tokyo    → up
+edge-virginia → up
+origin        → up
+```
+
+---
+
+## Verifying Metrics Directly
+
+Metrics exposed by an Edge Server can be checked with:
+
+```bash
+curl -s http://localhost:8001/metrics
+```
+
+To inspect only the custom CDN metrics:
+
+```bash
+curl -s http://localhost:8001/metrics | grep '^cdn_'
+```
+
+For example:
+
+```text
+cdn_requests_total{edge="mumbai"} 2.0
+cdn_cache_hits_total{edge="mumbai"} 1.0
+cdn_cache_misses_total{edge="mumbai"} 1.0
+```
+
+This demonstrates the relationship between requests and cache behaviour.
+
+---
+
+## Cache Hit Ratio
+
+The dashboard calculates cache hit ratio from the custom counters.
+
+Conceptually:
+
+```text
+Cache Hit Ratio =
+Cache Hits / Total Requests × 100
+```
+
+A PromQL expression can be used to calculate the ratio across the CDN:
+
+```promql
+sum(rate(cdn_cache_hits_total[$__rate_interval]))
+/
+sum(rate(cdn_requests_total[$__rate_interval]))
+* 100
+```
+
+## Infrastructure & Health
+
+This section focuses on runtime and infrastructure health.
+
+Panels include:
+
+- Process CPU Usage
+- Process Memory
+- Prometheus target health
+- Runtime/process metrics
+
+This section helps answer:
+
+> "Are the services and monitoring targets healthy?"
+
+---
+
+## Dashboard Variables
+
+The dashboard includes an `Edge` selector that can be used to filter metrics by Edge.
+
+Available Edge values include:
+
+```text
+All
+japan
+mumbai
+virginia
+```
+
+Selecting a specific Edge allows its traffic and cache behaviour to be inspected independently.
+
+---
+
+## Observability Flow
+
+The complete monitoring flow is:
+
+```text
+Client Request
+      │
+      ▼
+   Router
+      │
+      ▼
+  CDN Edge
+      │
+      ├──────────────► Redis Cache
+      │                    │
+      │              Cache Hit
+      │                    │
+      │                    ▼
+      │                 Response
+      │
+      └──── Cache Miss ────┐
+                           ▼
+                       Origin
+                           │
+                           ▼
+                       Response
+                           │
+                           ▼
+                      Edge Cache
+                           │
+                           ▼
+                        Client
+
+
+Meanwhile:
+
+Edge / Origin
+      │
+      │ /metrics
+      ▼
+ Prometheus
+      │
+      │ PromQL
+      ▼
+   Grafana
+      │
+      ▼
+CDN Operations Center
+```
+
+---
+
+## Why Observability Matters
+
+The observability layer makes the CDN behaviour measurable instead of relying only on manual testing.
+
+It provides visibility into:
+
+- How many requests the CDN receives
+- Which Edge receives traffic
+- How often requests are served from cache
+- How often the Origin must be contacted
+- How request latency changes
+- What HTTP responses are being generated
+- How large responses are
+- Whether monitoring targets are reachable
+- CPU and memory behaviour of the services
+
+This allows CDN-Prototype V1 to be evaluated not only as a functional system, but also as a system whose behaviour can be measured and analyzed.
+
+---
+
+## AWS Deployment
+
+For AWS, the observability stack is deployed separately from the individual CDN services.
+
+The repository contains an AWS-specific monitoring Compose file:
+
+```text
+docker-compose-monitoring.aws.yml
+```
+
+The monitoring instance runs:
+
+```text
+Prometheus
+Grafana
+```
+
+while the other EC2 instances run their respective CDN components.
+
+The architecture therefore separates:
+
+```text
+Application Infrastructure
+        +
+Monitoring Infrastructure
+```
+
+This keeps monitoring centralized while allowing the Origin and Edge services to remain independently deployed.
+
+---
+
+## V1 Observability Stack
+
+```text
+FastAPI
+   │
+   ├── prometheus-fastapi-instrumentator
+   │
+   └── custom Prometheus counters
+             │
+             ▼
+        /metrics
+             │
+             ▼
+        Prometheus
+             │
+             ▼
+          Grafana
+             │
+             ▼
+   CDN Operations Center
+```
+
+**Observability stack:**
+
+- **Prometheus** — metrics collection and time-series storage
+- **Grafana** — visualization and dashboarding
+- **prometheus-fastapi-instrumentator** — automatic FastAPI HTTP metrics
+- **prometheus_client** — custom CDN metrics
+- **PromQL** — metric querying and dashboard calculations
+
+---
+
+## V1 Status
+
+The observability layer completes the monitoring side of CDN-Prototype V1.
+
+The final V1 system therefore consists of:
+
+```text
+Router
+   │
+   ├── Mumbai Edge ─── Redis
+   │
+   ├── Tokyo Edge ──── Redis
+   │
+   └── Virginia Edge ─ Redis
+             │
+             ▼
+           Origin
+
+             +
+
+       Prometheus
+             │
+             ▼
+          Grafana
+             │
+             ▼
+    CDN Operations Center
+```
+
 
 ![Grafana Dashboard](docs/images/grafana-dashboard.jpg)
 
@@ -650,37 +1112,46 @@ The repository is organized around the major components of the CDN:
 
 ```text
 .
-├── router/
+├── docs/
 │   └── ...
 │
 ├── edge/
-│   ├── common/
-│   ├── mumbai/
-│   ├── virginia/
-│   └── tokyo/
+│   ├── Dockerfile
+│   └── main.py
+│
+├── nginx/
+│   └── nginx.conf
 │
 ├── origin/
-│   └── ...
+│   ├── __pycache__/
+│   ├── Dockerfile
+│   ├── main.py
+│   └── tempCodeRunnerFile.py
 │
-├── load-balancer/
-│   └── ...
+├── prometheus/
+│   └── prometheus.yml
 │
-├── monitoring/
-│   ├── prometheus/
-│   └── grafana/
+├── router/
+│   ├── __pycache__/
+│   ├── geoip/
+│   │   └── GeoLite2-City.mmdb
+│   ├── Dockerfile
+│   └── main.py
 │
-├── dashboard/
-│   └── ...
-│
+├── .gitignore
+├── docker-compose-monitoring.aws.yml
+├── docker-compose-mumbai-edge.aws.yml
+├── docker-compose-origin.aws.yml
+├── docker-compose-router.aws.yml
+├── docker-compose-tokyo-edge.aws.yml
+├── docker-compose-virginia-edge.aws.yml
 ├── docker-compose.yml
-├── docker-compose.edge.yml
-├── docker-compose.origin.yml
-├── requirements.txt
-└── README.md
-```
+├── IPs.txt
+├── README.md
+└── requirements.txt```
 
 > The exact filenames/directories above should be kept synchronized with the actual repository structure.
-
+```
 ---
 
 # 🛠️ Technology Stack
@@ -688,12 +1159,12 @@ The repository is organized around the major components of the CDN:
 | Layer                   | Technology               |
 | ----------------------- | ------------------------ |
 | Application             | Python                   |
-| API / Services          | Flask                    |
+| API / Services          | FastAPI                  |
 | Reverse Proxy           | Nginx                    |
 | Containerization        | Docker                   |
 | Container Orchestration | Docker Compose           |
 | Geographic Routing      | Coordinate-based routing |
-| Cache                   | Local edge cache         |
+| Edge Cache              | Redis                    |
 | Cloud Infrastructure    | AWS EC2                  |
 | Monitoring              | Prometheus               |
 | Visualization           | Grafana                  |
@@ -834,17 +1305,22 @@ Each edge received its own cache.
 
 A geographic router was introduced to select an appropriate edge based on user coordinates.
 
-### Stage 4 — Observability
+### Stage 4 — AWS multi-region deployment
 
-Prometheus and Grafana were added to make the system measurable.
+The logical edge locations were deployed onto geographically separated AWS EC2 instances in Mumbai, Tokyo, and Virginia, with the origin hosted in Seoul.
 
-### Stage 5 — Visualization
+### Stage 5 — Observability
+
+A dedicated monitoring EC2 instance was introduced with Prometheus and Grafana.
+Prometheus scrapes metrics from all three edges and the origin.
+
+### Stage 6 — Visualization
 
 A geographic visualization was introduced to make the routing and cache behavior understandable at a glance.
 
-### Stage 6 — AWS deployment
+### Stage 7 — Monitoring dashboard
 
-The logical edge locations were moved to actual geographically separated AWS regions.
+A Grafana CDN Operations Center dashboard was created to visualize request traffic, cache behavior, origin traffic, HTTP performance, infrastructure health, and per-edge behavior.
 
 This progression transformed the original cache/reverse-proxy system into a **geographically distributed CDN simulator**.
 
@@ -886,6 +1362,26 @@ Prometheus and Grafana provide visibility into the behavior of the distributed s
 
 ---
 
+# 🏁 V1 Status
+
+**CDN-Prototype V1 — COMPLETE**
+
+V1 successfully demonstrates:
+
+- Geographic request routing
+- Three geographically distributed edge locations
+- Independent Redis-based edge caches
+- Cache HIT/MISS behavior
+- Origin fallback
+- Origin infrastructure
+- Dockerized services
+- AWS multi-region deployment
+- Prometheus monitoring
+- Grafana visualization
+- Per-edge observability
+- HTTP performance monitoring
+
+  
 # ⚠️ Limitations
 
 This project intentionally simplifies several aspects of production CDN infrastructure.
@@ -1022,20 +1518,15 @@ into a single end-to-end architecture.
              └─────────────┼─────────────┘
                            │
                        CACHE MISS
-                           │
-                           ▼
-                 ┌──────────────────┐
-                 │  ORIGIN LOAD     │
-                 │    BALANCER      │
-                 └────────┬─────────┘
                           │
-                    ┌─────┴─────┐
-                    ▼           ▼
-                 Origin 1    Origin 2
+                          ▼           
+                        Origin     
 
-                 📊 Prometheus
-                       +
-                    Grafana
+          ┌───────────────────┐
+          │     Prometheus    │
+          │         +         │
+          │      Grafana      │
+          └───────────────────┘
 ```
 
 > **The project started as a cache/reverse-proxy system and evolved into a geographically distributed CDN simulator that demonstrates how modern CDNs bring content closer to users while reducing unnecessary origin traffic.**
